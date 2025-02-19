@@ -5,49 +5,20 @@ import CoreML
 class ProductSuggestionService {
     static let shared = ProductSuggestionService()
     
-    // Common product types by category with descriptive terms
-    private let suggestions: [ProductCategory: [(name: String, keywords: [String])]] = [
-        .clothing: [
-            ("T-Shirt", ["casual", "cotton", "crew neck", "v-neck"]),
-            ("Jeans", ["denim", "pants", "blue jeans", "skinny", "straight leg"]),
-            ("Sweater", ["pullover", "knit", "cardigan", "wool"]),
-            ("Jacket", ["coat", "outerwear", "bomber", "leather", "denim jacket"]),
-            ("Dress", ["gown", "sundress", "formal dress", "casual dress"]),
-            ("Hoodie", ["sweatshirt", "pullover", "zip-up", "hooded"]),
-            ("Blazer", ["suit jacket", "formal", "business attire"]),
-            ("Skirt", ["midi", "mini", "maxi", "pleated"])
-        ],
-        .shoes: [
-            ("Sneakers", ["athletic shoes", "trainers", "running shoes", "casual shoes"]),
-            ("Boots", ["ankle boots", "winter boots", "hiking boots", "combat boots"]),
-            ("Sandals", ["flip flops", "slides", "summer shoes", "beach shoes"]),
-            ("Heels", ["pumps", "stilettos", "dress shoes", "formal shoes"]),
-            ("Athletic Shoes", ["running shoes", "training shoes", "sports footwear"])
-        ],
-        .books: [
-            ("Hardcover", ["book", "novel", "hardback"]),
-            ("Paperback", ["book", "soft cover", "pocket book"]),
-            ("Textbook", ["educational", "academic", "study material"]),
-            ("Magazine", ["periodical", "publication", "glossy"])
-        ],
-        .other: [
-            ("Watch", ["timepiece", "wristwatch", "smartwatch", "digital watch"]),
-            ("Bag", ["handbag", "purse", "tote", "backpack", "shoulder bag"]),
-            ("Sunglasses", ["shades", "eyewear", "glasses"]),
-            ("Jewelry", ["necklace", "bracelet", "ring", "earrings"])
-        ]
+    // Common product keywords for better recognition
+    private let commonKeywords: [(name: String, keywords: [String])] = [
+        ("T-Shirt", ["casual", "cotton", "crew neck", "v-neck"]),
+        ("Jeans", ["denim", "pants", "blue jeans", "skinny", "straight leg"]),
+        ("Sweater", ["pullover", "knit", "cardigan", "wool"]),
+        ("Jacket", ["coat", "outerwear", "bomber", "leather", "denim jacket"]),
+        ("Dress", ["gown", "sundress", "formal dress", "casual dress"]),
+        ("Sneakers", ["athletic shoes", "trainers", "running shoes", "casual shoes"]),
+        ("Watch", ["timepiece", "wristwatch", "smartwatch", "digital watch"]),
+        ("Bag", ["handbag", "purse", "tote", "backpack", "shoulder bag"]),
+        ("Sunglasses", ["shades", "eyewear", "glasses"])
     ]
     
-    func getSuggestions(for category: ProductCategory, matching prefix: String = "") -> [String] {
-        let categoryItems = suggestions[category]?.map { $0.name } ?? []
-        if prefix.isEmpty {
-            return categoryItems
-        }
-        return categoryItems.filter { $0.lowercased().contains(prefix.lowercased()) }
-    }
-    
     func analyzeImageContent(_ image: UIImage, completion: @escaping ([String]) -> Void) {
-        // Create a dispatch group to handle multiple recognition requests
         let group = DispatchGroup()
         var allResults: Set<String> = []
         
@@ -72,7 +43,6 @@ class ProductSuggestionService {
             group.leave()
         }
         
-        // Process all results
         group.notify(queue: .main) {
             let processedResults = self.processResults(Array(allResults))
             completion(processedResults)
@@ -95,10 +65,9 @@ class ProductSuggestionService {
                 observation.topCandidates(1).first?.string
             }
             
-            // Process recognized text to extract brand names and product types
             let processedText = recognizedStrings.flatMap { text -> [String] in
                 let words = text.components(separatedBy: .whitespacesAndNewlines)
-                return words.filter { $0.count > 2 } // Filter out very short words
+                return words.filter { $0.count > 2 }
             }
             
             completion(processedText)
@@ -124,7 +93,6 @@ class ProductSuggestionService {
             }
             
             let topResults = results.prefix(5).compactMap { observation -> String? in
-                // Only include results with confidence above 0.3
                 guard observation.confidence > 0.3 else { return nil }
                 return observation.identifier
                     .split(separator: ",")
@@ -171,20 +139,16 @@ class ProductSuggestionService {
     private func processResults(_ results: [String]) -> [String] {
         var processedResults: Set<String> = []
         
-        // Flatten category suggestions for keyword matching
-        let allKeywords = suggestions.values.flatMap { categoryItems in
-            categoryItems.flatMap { item in
-                [item.name] + item.keywords
-            }
+        // Flatten keywords for matching
+        let allKeywords = commonKeywords.flatMap { item in
+            [item.name] + item.keywords
         }
         
         for result in results {
-            // Add the original result if it's long enough
             if result.count > 2 {
                 processedResults.insert(result)
             }
             
-            // Find matching keywords
             let matchingKeywords = allKeywords.filter { keyword in
                 keyword.lowercased().contains(result.lowercased()) ||
                 result.lowercased().contains(keyword.lowercased())
@@ -193,27 +157,9 @@ class ProductSuggestionService {
             processedResults.formUnion(matchingKeywords)
         }
         
-        // Sort and limit results
         return Array(processedResults)
             .sorted()
             .prefix(5)
             .map { $0.capitalized }
-    }
-    
-    // Helper function to find the most likely category for a product
-    func suggestCategory(from terms: [String]) -> ProductCategory {
-        var categoryScores: [ProductCategory: Int] = [:]
-        
-        for term in terms {
-            for (category, items) in suggestions {
-                let matches = items.filter { item in
-                    item.name.lowercased().contains(term.lowercased()) ||
-                    item.keywords.contains { $0.lowercased().contains(term.lowercased()) }
-                }
-                categoryScores[category, default: 0] += matches.count
-            }
-        }
-        
-        return categoryScores.max(by: { $0.value < $1.value })?.key ?? .other
     }
 } 

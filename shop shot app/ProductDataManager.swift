@@ -9,14 +9,23 @@ class ProductDataManager: ObservableObject {
         loadProducts()
     }
     
-    func addProduct(image: UIImage, category: ProductCategory, searchTerm: String) {
+    func addProduct(image: UIImage, searchTerm: String) {
         if let imageName = saveImage(image) {
             let newProduct = ProductItem(
                 image: imageName,
-                category: category,
                 searchTerm: searchTerm
             )
             products.append(newProduct)
+            saveProducts()
+        }
+    }
+    
+    func updateProduct(_ product: ProductItem, newSearchTerm: String) {
+        if let index = products.firstIndex(where: { $0.id == product.id }) {
+            products[index] = ProductItem(
+                image: product.image,
+                searchTerm: newSearchTerm
+            )
             saveProducts()
         }
     }
@@ -53,25 +62,12 @@ class ProductDataManager: ObservableObject {
     }
     
     func deleteProduct(_ product: ProductItem) {
-        // Delete the image file
         if let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             let imageUrl = documentsDirectory.appendingPathComponent(product.image)
             try? FileManager.default.removeItem(at: imageUrl)
         }
         
-        // Remove from products array
         products.removeAll { $0.id == product.id }
         saveProducts()
-    }
-    
-    func updateProduct(_ product: ProductItem, newCategory: ProductCategory, newSearchTerm: String) {
-        if let index = products.firstIndex(where: { $0.id == product.id }) {
-            products[index] = ProductItem(
-                image: product.image,
-                category: newCategory,
-                searchTerm: newSearchTerm
-            )
-            saveProducts()
-        }
     }
 } 
