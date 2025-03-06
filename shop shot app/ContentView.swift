@@ -161,122 +161,6 @@ struct ProductCard: View {
     }
 }
 
-struct SimilarProductsView: View {
-    let searchTerm: String
-    @Environment(\.dismiss) private var dismiss
-    @State private var isLoading = true
-    @State private var priceHistory: [ProductAIService.PriceHistory] = []
-    
-    let shoppingSites: [(name: String, icon: String, urlFormat: String)] = [
-        ("Amazon", "cart", "https://www.amazon.com/s?k=%@"),
-        ("Walmart", "cart.fill", "https://www.walmart.com/search?q=%@"),
-        ("Target", "cart.circle", "https://www.target.com/s?searchTerm=%@")
-    ]
-    
-    var body: some View {
-        List {
-            if !priceHistory.isEmpty {
-                Section(header: Text("Price History")) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Chart {
-                            ForEach(priceHistory, id: \.date) { point in
-                                LineMark(
-                                    x: .value("Date", point.date),
-                                    y: .value("Price", point.price)
-                                )
-                                .foregroundStyle(by: .value("Store", point.store))
-                            }
-                        }
-                        .frame(height: 200)
-                        
-                        // Current prices
-                        let currentPrices = ProductAIService.shared.getCurrentPrices(for: searchTerm)
-                        ForEach(currentPrices, id: \.store) { storePrices in
-                            HStack {
-                                Text(storePrices.store)
-                                    .fontWeight(.medium)
-                                Spacer()
-                                Text("$\(storePrices.price, specifier: "%.2f")")
-                                    .foregroundColor(.green)
-                            }
-                            .padding(.vertical, 2)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                }
-            }
-            
-            Section {
-                if isLoading {
-                    ForEach(shoppingSites, id: \.name) { site in
-                        HStack {
-                            Image(systemName: site.icon)
-                                .foregroundColor(.blue)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(site.name)
-                                    .fontWeight(.medium)
-                                HStack {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                    Text("Checking prices...")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    ForEach(shoppingSites, id: \.name) { site in
-                        Button {
-                            openSite(urlFormat: site.urlFormat)
-                            dismiss()
-                        } label: {
-                            HStack {
-                                Image(systemName: site.icon)
-                                    .foregroundColor(.blue)
-                                Text(site.name)
-                                Spacer()
-                                Image(systemName: "arrow.up.right")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                    }
-                }
-            } header: {
-                Text("Available at these stores")
-            } footer: {
-                Text("Prices and availability may vary")
-                    .font(.caption)
-            }
-        }
-        .navigationTitle("Similar Products")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Done") {
-                    dismiss()
-                }
-            }
-        }
-        .onAppear {
-            // Load price history
-            priceHistory = ProductAIService.shared.getPriceHistory(for: searchTerm)
-            
-            // Simulate loading delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                isLoading = false
-            }
-        }
-    }
-    
-    private func openSite(urlFormat: String) {
-        let encodedTerm = searchTerm.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = String(format: urlFormat, encodedTerm)
-        if let url = URL(string: urlString) {
-            UIApplication.shared.open(url)
-        }
-    }
-}
-
 struct AddProductView: View {
     @Binding var image: UIImage?
     @Environment(\.dismiss) private var dismiss
@@ -362,7 +246,6 @@ struct EditProductView: View {
     let dataManager: ProductDataManager
     @Environment(\.dismiss) private var dismiss
     @State private var searchTerm: String
-    @State private var showingSimilarProducts = false
     
     init(product: ProductItem, dataManager: ProductDataManager) {
         self.product = product
@@ -383,20 +266,6 @@ struct EditProductView: View {
                 Section("Product Name") {
                     TextField("Product Name", text: $searchTerm)
                 }
-                
-                Section {
-                    Button {
-                        showingSimilarProducts = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                            Text("Find Similar Products")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
-                        }
-                    }
-                }
             }
             .navigationTitle("Edit Product")
             .toolbar {
@@ -413,11 +282,6 @@ struct EditProductView: View {
                         )
                         dismiss()
                     }
-                }
-            }
-            .sheet(isPresented: $showingSimilarProducts) {
-                NavigationStack {
-                    SimilarProductsView(searchTerm: searchTerm)
                 }
             }
         }

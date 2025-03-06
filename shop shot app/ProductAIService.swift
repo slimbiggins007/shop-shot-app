@@ -4,15 +4,6 @@ import UIKit
 class ProductAIService {
     static let shared = ProductAIService()
     
-    // Price tracking functionality
-    struct PriceHistory {
-        let date: Date
-        let price: Double
-        let store: String
-    }
-    
-    private var priceHistories: [String: [PriceHistory]] = [:]
-    
     func analyzeImage(_ image: UIImage, completion: @escaping (String?) -> Void) {
         guard let preprocessedImage = preprocessImage(image),
               let cgImage = preprocessedImage.cgImage else {
@@ -41,11 +32,6 @@ class ProductAIService {
         group.notify(queue: .main) {
             let searchTerm = self.processTerms(Array(detectedTerms))
             completion(searchTerm.isEmpty ? nil : searchTerm)
-            
-            // After identifying the product, fetch price history
-            if let term = searchTerm {
-                self.fetchPriceHistory(for: term)
-            }
         }
     }
     
@@ -151,50 +137,6 @@ class ProductAIService {
         return processedTerms
             .prefix(3)
             .joined(separator: " ")
-    }
-    
-    private func fetchPriceHistory(for product: String) {
-        // Simulate fetching price history from different stores
-        let stores = ["Amazon", "Walmart", "Target"]
-        var histories: [PriceHistory] = []
-        
-        // Generate 30 days of price history
-        let calendar = Calendar.current
-        let today = Date()
-        
-        for store in stores {
-            var basePrice = Double.random(in: 30...80)
-            
-            for day in 0..<30 {
-                if let date = calendar.date(byAdding: .day, value: -day, to: today) {
-                    let fluctuation = Double.random(in: -5...5)
-                    basePrice += fluctuation
-                    basePrice = max(basePrice, 10)
-                    
-                    histories.append(PriceHistory(
-                        date: date,
-                        price: basePrice,
-                        store: store
-                    ))
-                }
-            }
-        }
-        
-        priceHistories[product] = histories
-    }
-    
-    func getPriceHistory(for product: String) -> [PriceHistory] {
-        return priceHistories[product] ?? []
-    }
-    
-    func getCurrentPrices(for product: String) -> [(store: String, price: Double)] {
-        let history = priceHistories[product] ?? []
-        let latestPrices = Dictionary(grouping: history) { $0.store }
-            .compactMap { store, prices -> (String, Double)? in
-                guard let latestPrice = prices.max(by: { $0.date < $1.date }) else { return nil }
-                return (store, latestPrice.price)
-            }
-        return latestPrices
     }
     
     // Backup method using object detection
